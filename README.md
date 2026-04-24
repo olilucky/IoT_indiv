@@ -28,33 +28,31 @@ Our implementation is found in [AdaptFrequency.cpp](https://github.com/olilucky/
 We see that the algorithm converges rather quickly to $5Hz$.
 By conducting experiments, the queue length was increased to 128 and the minimum sampling rate to $20Hz$, since a lower resolution would lead to an estimate closer to $6Hz$.
 
-### Timing
-After implementing a functioning FFT reporter, I turned towards the question of how fast the fourier transform was. The `micros()` function was clearly more suited to capture the resolution at this miniscule timescale instead of using ticks. Using the propper commands, the board's APB was found to be running at 80MHz. Inquiring about the timing ended up paying off, as the FFT was found to take approximately 25ms. This was brought down to 15 ms after switching the ArduinoFFT data type from `double` to `float`. If this project were built on hardware, the time could be reduced further.
-
 ### Bonus signals
 Next, I wanted to see what happens when the signal consists of two waves with the same amplitude but different frequencies :
 $6\sin(2 \pi * 9 * t) + 6\sin(2 \pi * 7 * t)$. 
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_adapt.png)
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_bonus1.png)
 
 This proved to be no problem for our FFT, as it looped between a value of $6.9Hz$ and $7.0Hz$ after two generations.
 
 Finally, I was curious about obtaining a signal with 3 terms such that the lowest frequency has the highest amplitude:
 $8\sin(2 \pi * 6 * t) + 3\sin(2 \pi * 10 * t) + 5\sin(2 \pi * 25 * t)$.
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_adapt.png)
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_bonus2.png)
 
 Also this signal is no problem for our FFT, since it identifies the lowest frequency quickly by converging on $5.9Hz$. Here again, the bin width could explain why the measurement is not perfect.
 
+### Performance - Timing
+After implementing a functioning FFT reporter, I turned towards the question of how fast the fourier transform was. The `micros()` function was clearly more suited to capture the resolution at this miniscule timescale instead of using ticks. Using the propper commands, the board's APB was found to be running at 80MHz. Inquiring about the timing ended up paying off, as the FFT was found to take approximately 25ms. This was brought down to 15 ms after switching the ArduinoFFT data type from `double` to `float`. If this project were built on hardware, the time could be reduced further.
 
-### Physical Implementation
-
+### Performance - Power measurements
+I tried implementing an INA219 component in my Wokwi simulator but that would lead to redundant information. Due to this reason and the difficulty to implement it, I have instead o opted not to measure the power.
 
 ## Internet connection
 After struggling to setup MQTT, the simulator finally managed to get a working WiFi signal. Nevertheless, the plan I was working with 
 
-## System Performance
 
 
-### Power measurements
-I tried implementing an INA219 component in my Wokwi simulator but that would lead to redundant information. Due to this reason and the difficulty to implement it, I have instead o opted not to measure the power.
+
+
