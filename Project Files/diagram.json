@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "author": "Uri Shaked",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-ina219",
+      "id": "pwr",
+      "top": -120,
+      "left": -200,
+      "attrs": { "address": "0x40" }
+    },
+    { 
+      "type": "wokwi-esp32-devkit-v1", 
+      "id": "esp", 
+      "top": -78.19, 
+      "left": 44.14, 
+      "attrs": {} 
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd1",
+      "top": -65.71,
+      "left": 191.17,
+      "attrs": { "pins": "i2c" }
+    },
+    {
+      "type": "wokwi-mqtt-broker",
+      "id": "mqtt1"
+    }
+  ],
+  "connections": [
+    [ "pwr:GND", "esp:EN", "black", [ "h-49.47", "v150.31" ]  ],
+    [ "pwr:VCC", "esp:3V3", "red", [] ],
+    [ "pwr:SDA", "esp:D21", "green", [] ],
+    [ "pwr:SCL", "esp:D22", "blue", [] ],
+
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+
+    [ "esp:NET", "mqtt1:NET", "blue", []],
+
+    [ "lcd1:SDA", "esp:D21", "green", [ "h-49.47", "v150.31" ] ],
+    [ "lcd1:GND", "esp:GND.1", "black", [ "h-16.67", "v162.78" ] ],
+    [ "lcd1:VCC", "esp:3V3", "red", [ "h-8.13", "v196.73" ] ],
+    [ "lcd1:SCL", "esp:D22", "purple", [ "h-27.75", "v-44.32" ] ]
+  ]
+}
