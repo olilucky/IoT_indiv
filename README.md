@@ -1,4 +1,4 @@
-# IoT Individual Assignment - 
+# IoT Individual Assignment
 Individual Assignment for IoT course 2026
 
 ## Introduction
@@ -51,11 +51,11 @@ After implementing a functioning FFT reporter, I turned towards the question of 
 ### Performance - Power measurements
 I tried implementing an INA219 component in my Wokwi simulator but that would lead to redundant information. Instead, I opted to simulate the consumption of power for different tasks the board was performing.
 
-Implementation can be found here at [RunMQTT.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/RunMQTT.cpp), and provides the following output:
+Implementation can be found here at [PowerConsumption.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/PowerConsumption.cpp), and provides the following output:
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_internet.png)
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_PowerConsumption.png)
 
-The code works by establishing a baseline consumption of 55mA, since the ESP32 board is estimated to draw that much power while the CPU is running ([Section 4.1])(https://documentation.espressif.com/esp32_datasheet_en.pdf). Subsequently, a variable load proportional to the sampling frequency (currentFs) is added, representing the energy required to toggle the ADC and move data through memory. To simulate the FFT a conditional increase (adding 35–40mA) is triggered only when the FFT buffer is full. This is illustrated in the last entry for >Power in the output image.
+The code works by establishing a baseline consumption of 55mA, since the ESP32 board is estimated to draw that much power while the CPU is running ([according to Section 4.1](https://documentation.espressif.com/esp32_datasheet_en.pdf)). Subsequently, a variable load proportional to the sampling frequency (currentFs) is added, representing the energy required to toggle the ADC and move data through memory. To simulate the FFT a conditional increase (adding 35–40mA) is triggered only when the FFT buffer is full. This is illustrated in the last entry for >Power in the output image.
 
 ## Internet connection
 After struggling to setup MQTT, a functioning version could finally be implemented without crashing. In tandem with the 5 second reports, the system attempts to publish its aggregated findings (specifically the average signal value, the dominant frequency, the current sampling rate and the average execution time). For the implementation, we opted to wrap the findings in a JSON string and to utilize asynchronous communication.
