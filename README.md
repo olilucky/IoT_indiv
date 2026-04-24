@@ -69,5 +69,9 @@ The code is able to establish a connection and receive an IP but publishing the 
 That is because the Wokwi simulator requires a subscription that costs funds for WiFi functionality. Physical parts equally so.
 
 ## Bonus
-We did not have time to implement to work on the bonus till the end. 
+We did not have time to implement to work on the bonus till the end. The code supplied in [Bonus.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/Bonus.cpp) only includes the signal generation, but not the fitlers. The output of this code looks like this:
+
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFrequency.png)
+
+This image also illustrates the setup I was working with, which is included in the Project Files folder.
 
