@@ -21,7 +21,7 @@ Note that these specific results are unrealistic, however, since it runs in Wokw
 ## Adaptive Sampling
 Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $128$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. Our initial sample will run at $100Hz$, which gives us a bin width of $0.781Hz$. Afterwards, every 5 seconds the sampled data is used to find a new sampling frequency.
 
-Our implementation is found in [AdaptFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp).
+Our implementation is found in [AdaptFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/AdaptFrequency.cpp).
 
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_adapt.png)
 
@@ -49,13 +49,20 @@ Also this signal is no problem for our FFT, since it identifies the lowest frequ
 After implementing a functioning FFT reporter, I turned towards the question of how fast the fourier transform was. The `micros()` function was clearly more suited to capture the resolution at this miniscule timescale instead of using ticks. Using the propper commands, the board's APB was found to be running at 80MHz. Inquiring about the timing ended up paying off, as the FFT was found to take approximately 25ms. This was brought down to 15 ms after switching the ArduinoFFT data type from `double` to `float`. If this project were built on hardware, the time could be reduced further.
 
 ### Performance - Power measurements
-I tried implementing an INA219 component in my Wokwi simulator but that would lead to redundant information. Due to this reason and the difficulty to implement it, I have instead o opted not to measure the power.
+I tried implementing an INA219 component in my Wokwi simulator but that would lead to redundant information. Instead, I opted to simulate the consumption of power for different tasks the board was performing.
+
+Implementation can be found here at [RunMQTT.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/RunMQTT.cpp), and provides the following output:
+
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_internet.png)
+
+The code works by establishing a baseline consumption of 55mA, since the ESP32 board is estimated to draw that much power while the CPU is running ([Section 4.1])(https://documentation.espressif.com/esp32_datasheet_en.pdf). Subsequently, a variable load proportional to the sampling frequency (currentFs) is added, representing the energy required to toggle the ADC and move data through memory. To simulate the FFT a conditional increase (adding 35–40mA) is triggered only when the FFT buffer is full. This is illustrated in the last entry for >Power in the output image.
 
 ## Internet connection
-After struggling to setup MQTT, a functioning version could finally be implemented without crashing. In tandem with the 5 second reports, the system attempts to publish its aggregated findings (specifically the average signal value, the dominant frequency, the current sampling rate and the average execution time).
-Running [MaxFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp), yields:
+After struggling to setup MQTT, a functioning version could finally be implemented without crashing. In tandem with the 5 second reports, the system attempts to publish its aggregated findings (specifically the average signal value, the dominant frequency, the current sampling rate and the average execution time). For the implementation, we opted to wrap the findings in a JSON string and to utilize asynchronous communication.
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_bonus2.png)
+Running [RunMQTT.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/RunMQTT.cpp), yields:
+
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_internet.png)
 
 The code is able to establish a connection and receive an IP but publishing the findings results in an error.
 That is because the Wokwi simulator requires a subscription that costs money for WiFi functionality. Furthermore, buying the necessary parts costs money.
