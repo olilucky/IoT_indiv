@@ -66,9 +66,8 @@ Running [RunMQTT.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/RunMQ
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_internet.png)
 
 The code is able to establish a connection and receive an IP but publishing the findings results in an error.
-That is because the Wokwi simulator requires a subscription that costs money for WiFi functionality. Furthermore, buying the necessary parts costs money.
+That is because the Wokwi simulator requires a subscription that costs funds for WiFi functionality. Physical parts equally so.
 
 ## Bonus
-
-
+We did not have time to implement to work on the bonus till the end. 
 
