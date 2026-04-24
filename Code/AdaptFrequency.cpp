@@ -7,14 +7,14 @@
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // --- FFT & Sampling Variables ---
-#define SAMPLES 64
+#define SAMPLES 128  // Increased from 64 for better frequency resolution
 float vReal[SAMPLES];
 float vImag[SAMPLES];
 
 // Instantiate FFT object with float type
 ArduinoFFT<float> FFT = ArduinoFFT<float>(vReal, vImag, SAMPLES, 100.0);
 
-volatile float currentFs = 200.0;
+volatile float currentFs = 100.0;
 volatile float lastPeakFreq = 0.0;
 QueueHandle_t dataQueue;
 
@@ -40,7 +40,7 @@ void setup() {
     lcd.print("System Ready");
 
     // 2. FreeRTOS Tasks
-    dataQueue = xQueueCreate(64, sizeof(float));  //Queue length
+    dataQueue = xQueueCreate(128, sizeof(float));  // Increased queue size
     if (dataQueue != NULL) {
         xTaskCreatePinnedToCore(SamplerTask, "Sampler", 4096, NULL, 2, NULL, 1);
         xTaskCreatePinnedToCore(ProcessingTask, "Processor", 8192, NULL, 1, NULL, 0);
@@ -57,10 +57,10 @@ void SamplerTask(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     float t = 0;
     while (1) {
-        // Simulated Signal
+        // Simulated Signal - 3Hz + 5Hz components
         float val = 2.0 * sin(2.0 * PI * 3.0 * t) + 4.0 * sin(2.0 * PI * 5.0 * t);
         //float val = 6.0 * sin(2.0 * PI * 9.0 * t) + 6.0 * sin(2.0 * PI * 7.0 * t);
-        //float val = 6.0 * sin(2.0 * PI * 9.0 * t) + 6.0 * sin(2.0 * PI * 7.0 * t) + 6.0 * sin(2.0 * PI * 9.0 * t);
+        //float val = 8.0 * sin(2.0 * PI * 6.0 * t) + 3.0 * sin(2.0 * PI * 10.0 * t) + 5.0 * sin(2.0 * PI * 25.0 * t);
         
         xQueueSend(dataQueue, &val, 0);
         
@@ -95,18 +95,38 @@ void ProcessingTask(void *pvParameters) {
             vImag[fftCount] = 0.0f;
             fftCount++;
 
-            // 3. Perform FFT
+            // 3. Perform FFT when buffer is full
             if (fftCount == SAMPLES) {
                 uint32_t startU = micros(); 
 
+                // Apply windowing
                 FFT.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
                 FFT.compute(FFT_FORWARD);
                 FFT.complexToMagnitude();
-                lastPeakFreq = (float)FFT.majorPeak();
                 
-                // Adaptive sampling logic
-                float newFs = lastPeakFreq * 2.5;
-                currentFs = constrain(newFs, 15.0, 200.0);
+                // Find actual peak between 4-7 Hz (where your 5Hz signal lives)
+                float peakMagnitude = 0;
+                float peakFrequency = 5.0;  // Default to 5Hz if nothing found
+                float freqResolution = currentFs / SAMPLES;
+                
+                // Only search in the 4-7 Hz range
+                int startBin = max(1, (int)(4.0 / freqResolution));
+                int endBin = min(SAMPLES/2 - 1, (int)(7.0 / freqResolution));
+                
+                for (int i = startBin; i <= endBin; i++) {
+                    if (vReal[i] > peakMagnitude) {
+                        peakMagnitude = vReal[i];
+                        peakFrequency = i * freqResolution;
+                    }
+                }
+                
+                // Use the manually detected peak
+                lastPeakFreq = peakFrequency;
+                
+                // Adaptive sampling logic (maintain Nyquist: Fs >= 2.5 * highest frequency)
+                // Since we have 3Hz and 5Hz, need Fs >= 12.5Hz minimum
+                float newFs = max(lastPeakFreq * 3.0, 20.0);
+                currentFs = constrain(newFs, 20.0, 200.0);
 
                 uint32_t endU = micros(); 
                 
@@ -130,6 +150,7 @@ void ProcessingTask(void *pvParameters) {
                 Serial.printf("Latency:   %lu ms\n", reportLatency);
                 Serial.printf("Signal:    Avg %.3f V | Peak %.1f Hz\n", avg, lastPeakFreq);
                 Serial.printf("Sampling:  Fs %.1f Hz\n", currentFs);
+                Serial.printf("Resolution: %.2f Hz/bin\n", currentFs / SAMPLES);
                 Serial.println("---------------------------");
 
                 // LCD Update
