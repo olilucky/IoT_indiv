@@ -30,7 +30,7 @@ By conducting experiments, the queue length was increased to 128 and the minimum
 
 ### Bonus signals
 Next, I wanted to see what happens when the signal consists of two waves with the same amplitude but different frequencies :
-$6\sin(2 \pi * 9 * t) + 6\sin(2 \pi * 7 * t)$. 
+$6\sin(2 \pi * 9 * t) + 6\sin(2 \pi * 7 * t)$.
 
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_bonus1.png)
 
