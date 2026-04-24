@@ -9,17 +9,19 @@ Seeing as I am an Erasmus student, I have practically no experience with impleme
 
 ## Adapative Sampling
 ### Prelimenaries: Maximum Sampling
-While the ESP32 hardware supports sampling rates [up to 2 MHz](https://docs.espressif.com/projects/esp-faq/en/latest/software-framework/peripherals/adc.html), we need to run experiments before we can come up with an actual answer. Luckily, a benchmark exists for this exact purpose: by running two seperate CPU cores in parallel to push and pull data through a queue as fast as possible for 1000 ticks, we can calculate the maximum frequency. Running the code supplied in [MaxFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp), yields the following result:
+While the ESP32 hardware supports sampling rates [up to 2 MHz](https://docs.espressif.com/projects/esp-faq/en/latest/software-framework/peripherals/adc.html), we need to run experiments before we can come up with an actual answer. Luckily, a benchmark exists for this exact purpose: by running two seperate CPU cores in parallel to push and pull data through a queue as fast as possible for 1000 ticks, we can calculate the maximum frequency. 
+
+Running the code supplied in [MaxFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp), yields the following result:
 
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFrequency.png)
 
-Note that these specific results are unrealistic, however, since it runs in Wokwi. In any case, we have opted to cap the frequency rate at $500Hz$ which is also feasible for physical hardware.
+Note that these specific results are unrealistic, however, since it runs in Wokwi. In any case, we have opted to cap the frequency rate at $200Hz$ which is also feasible for physical hardware.
 
 
 ### Adaptive Sampling
-Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t)+4 \sin(2 \pi * 5 * t)$.
+Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $64$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. Our initial sample will run at $200Hz$, which gives us a bin width of $0.32Hz$
 
-
+Our implementation is found in [AdaptFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp).
 
 ### Bonus
 Next, I wanted to see what happens when two signals with the same amplitude but different frequencies get mixed. I therefore decided to consider
