@@ -73,5 +73,5 @@ We did not have time to implement to work on the bonus till the end. The code su
 
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/Bonus.png)
 
-This image also illustrates the setup I was working with, which is included in the Project Files folder.
+This image also illustrates the setup I was working with, which is included in the [Project Files](https://github.com/olilucky/IoT_indiv/tree/main/Project%20Files) folder.
 
