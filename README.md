@@ -15,13 +15,19 @@ Running the code supplied in [MaxFrequency.cpp](https://github.com/olilucky/IoT_
 
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFrequency.png)
 
-Note that these specific results are unrealistic, however, since it runs in Wokwi. In any case, we have opted to cap the frequency rate at $200Hz$ which is also feasible for physical hardware.
+Note that these specific results are unrealistic, however, since it runs in Wokwi. In any case, we have opted to cap the frequency rate at $100Hz$ which is also feasible for physical hardware and avoids oversampling.
 
 
 ### Adaptive Sampling
-Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $64$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. Our initial sample will run at $200Hz$, which gives us a bin width of $0.32Hz$
+Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $128$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. Our initial sample will run at $100Hz$, which gives us a bin width of $1.56Hz$.
 
 Our implementation is found in [AdaptFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp).
+
+We see that the algorithm converges rather quickly to $5Hz$.
+By conducting experiments, the queue length was increased to 128 and the minimum sampling rate to $20Hz$, since a lower resolution would lead to an estimate closer to $6Hz$.
+
+### Timing
+After implementing a functioning FFT reporter, I turned towards the question of how fast the fourier transform was. The `micros()` function was clearly more suited to capture the resolution at this miniscule timescale instead of using ticks. Using the propper commands, the board's APB was found to be running at 80MHz. Inquiring about the timing ended up paying off, as the FFT was found to take approximately 25ms. This was brought down to 7.8 ms after switching the ArduinoFFT data type from `double` to `float`. If this project were built on hardware, the time could be reduced further.
 
 ### Bonus
 Next, I wanted to see what happens when two signals with the same amplitude but different frequencies get mixed. I therefore decided to consider
@@ -37,8 +43,7 @@ $8\sin(2 \pi * 6 * t) + 3\sin(2 \pi * 10 * t) + 5\sin(2 \pi * 25 * t)$
 After struggling to setup MQTT, the simulator finally managed to get a working WiFi signal. Nevertheless, the plan I was working with 
 
 ## System Performance
-### Timing
-After implementing a functioning FFT reporter, I turned towards the question of how fast the fourier transform was. The `micros()` function was clearly more suited to capture the resolution at this miniscule timescale instead of using ticks. Using the propper commands, the board's APB was found to be running at 80MHz. Inquiring about the timing ended up paying off, as the FFT was found to take approximately 25ms. This was brought down to 7.8 ms after switching the ArduinoFFT data type from `double` to `float`. If this project were built on hardware, the time could be reduced further.
+
 
 ### Power measurements
 I tried implementing an INA219 component in my Wokwi simulator but that would lead to redundant information. Due to this reason and the difficulty to implement it, I have instead o opted not to measure the power.
