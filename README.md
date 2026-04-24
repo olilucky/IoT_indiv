@@ -71,7 +71,7 @@ That is because the Wokwi simulator requires a subscription that costs funds for
 ## Bonus and Project setup
 We did not have time to implement to work on the bonus till the end. The code supplied in [Bonus.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/Bonus.cpp) only includes the signal generation, but not the fitlers. The output of this code looks like this:
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_Bonus.png)
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/Iot_Bonus.png)
 
 This image also illustrates the setup I was working with, which is included in the [Project Files](https://github.com/olilucky/IoT_indiv/tree/main/Project%20Files) folder.
 
