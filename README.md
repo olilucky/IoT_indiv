@@ -6,7 +6,7 @@ Individual Assignment for IoT course 2026, by Oliver van Douveren
 ### Adaptive Sampling (+Bonus signals)
 ### Performance (Latency & Power Consumption)
 ### Internet Connection
-### Bonus
+### Bonus and Project Setup
 
 ## Prelimenaries: Maximum Sampling
 While the ESP32 hardware supports sampling rates [up to 2 MHz](https://docs.espressif.com/projects/esp-faq/en/latest/software-framework/peripherals/adc.html), we need to run experiments before we can come up with an actual answer. Luckily, a benchmark exists for this exact purpose: by running two seperate CPU cores in parallel to push and pull data through a queue as fast as possible for 1000 ticks, we can calculate the maximum frequency. 
@@ -68,10 +68,10 @@ Running [RunMQTT.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/RunMQ
 The code is able to establish a connection and receive an IP but publishing the findings results in an error.
 That is because the Wokwi simulator requires a subscription that costs funds for WiFi functionality. Physical parts equally so.
 
-## Bonus
+## Bonus and Project setup
 We did not have time to implement to work on the bonus till the end. The code supplied in [Bonus.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/Bonus.cpp) only includes the signal generation, but not the fitlers. The output of this code looks like this:
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFrequency.png)
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/Bonus.png)
 
 This image also illustrates the setup I was working with, which is included in the Project Files folder.
 
