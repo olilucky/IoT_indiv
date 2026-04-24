@@ -14,7 +14,7 @@ float vImag[SAMPLES];
 // Instantiate FFT object with float type
 ArduinoFFT<float> FFT = ArduinoFFT<float>(vReal, vImag, SAMPLES, 100.0);
 
-volatile float currentFs = 100.0;
+volatile float currentFs = 200.0;
 volatile float lastPeakFreq = 0.0;
 QueueHandle_t dataQueue;
 
@@ -40,7 +40,7 @@ void setup() {
     lcd.print("System Ready");
 
     // 2. FreeRTOS Tasks
-    dataQueue = xQueueCreate(64, sizeof(float)); 
+    dataQueue = xQueueCreate(64, sizeof(float));  //Queue length
     if (dataQueue != NULL) {
         xTaskCreatePinnedToCore(SamplerTask, "Sampler", 4096, NULL, 2, NULL, 1);
         xTaskCreatePinnedToCore(ProcessingTask, "Processor", 8192, NULL, 1, NULL, 0);
@@ -59,6 +59,8 @@ void SamplerTask(void *pvParameters) {
     while (1) {
         // Simulated Signal
         float val = 2.0 * sin(2.0 * PI * 3.0 * t) + 4.0 * sin(2.0 * PI * 5.0 * t);
+        //float val = 6.0 * sin(2.0 * PI * 9.0 * t) + 6.0 * sin(2.0 * PI * 7.0 * t);
+        //float val = 6.0 * sin(2.0 * PI * 9.0 * t) + 6.0 * sin(2.0 * PI * 7.0 * t) + 6.0 * sin(2.0 * PI * 9.0 * t);
         
         xQueueSend(dataQueue, &val, 0);
         
@@ -104,7 +106,7 @@ void ProcessingTask(void *pvParameters) {
                 
                 // Adaptive sampling logic
                 float newFs = lastPeakFreq * 2.5;
-                currentFs = constrain(newFs, 15.0, 500.0);
+                currentFs = constrain(newFs, 15.0, 200.0);
 
                 uint32_t endU = micros(); 
                 
