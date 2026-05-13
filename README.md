@@ -18,19 +18,26 @@ Our result of 38238.00 Hz falls short of the theoretical limit. For our use-case
 
 ### Simulated Maximum Sampling
 Running the same code on a Wokwi gives us higher number than the real implementation, though nowhere near the theoretical limit:
+
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFrequency.png)
 
 
 
 ## Adaptive Sampling
-Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $128$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. Our initial sample will run at $100Hz$, which gives us a bin width of $0.781Hz$. Afterwards, every 5 seconds the sampled data is used to find a new sampling frequency.
+Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $128$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. For the performance, we chose to pay attention to the mA, current and energy consumption.
+
+### 100Hz Sampling
+Our initial sample will run at $100Hz$, which gives us a bin width of $0.781Hz$. Afterwards, every 5 seconds the sampled data is used to find a new sampling frequency. In our implementation we added a resting phase and a measuring phase, in order to distinguish between the actual FFT and the background processes.
+
+The code of our implementation is found in [MaxFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp).
+
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFreq.png)
+
+As we see in our graph, there is not a lot of difference in terms of power consumption between the two phases. Nevertheless, there is a slight increase when measuring which is to be expected.
+
 
 Our implementation is found in [AdaptFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/AdaptFrequency.cpp).
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_adapt.png)
-
-We see that the algorithm converges rather quickly to $5Hz$.
-By conducting experiments, the queue length was increased to 128 and the minimum sampling rate to $20Hz$, since a lower resolution would lead to an estimate closer to $6Hz$. 
 All in all, thanks to our adapative sampling we are able to greatly decrease the CPU load from $100Hz$ to only $20Hz$.
 
 ### Bonus signals
