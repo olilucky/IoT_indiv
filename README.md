@@ -14,7 +14,7 @@ While the ESP32 hardware supports sampling rates [up to 2 MHz](https://docs.espr
 Running the code supplied in [MaxFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp), yields the following result:
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/max_freq.jpg)
 
-Our result of 32832.00 Hz falls short of the theoretical limit. For our use-case, however, it is more than enough for our present purposes.
+Our result of 38238.00 Hz falls short of the theoretical limit. For our use-case, however, it is more than enough for our present purposes.
 
 ### Simulated Maximum Sampling
 Running the same code on a Wokwi gives us higher number than the real implementation, though nowhere near the theoretical limit:
