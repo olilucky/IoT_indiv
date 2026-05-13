@@ -4,9 +4,9 @@ Individual Assignment for IoT course 2026, by Oliver van Douveren
 ## Layout
 ### Prelimenaries: Maximum Sampling
 ### Adaptive Sampling (+Bonus signals)
-### Performance (Latency & Power Consumption)
-### Internet Connection
-### Bonus and Project Setup
+### WiFi Connection
+### Cloud Connection
+### Project Setup
 
 ## Prelimenaries: Maximum Sampling
 While the ESP32 hardware supports sampling rates [up to 2 MHz](https://docs.espressif.com/projects/esp-faq/en/latest/software-framework/peripherals/adc.html), we need to run experiments before we can come up with an actual answer. Luckily, a benchmark exists for this exact purpose: by running two seperate CPU cores in parallel to push and pull data through a queue as fast as possible for 1000 ticks, we can calculate the maximum frequency. 
@@ -24,14 +24,14 @@ Running the same code on a Wokwi gives us higher number than the real implementa
 ## Adaptive Sampling
 Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $128$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. For the performance, we chose to pay attention to the mA, current and energy consumption.
 
-Experimentation has shown that powering the system through wires and the connection of a USB-C for the graphs, did lead to some minor interference in the measurements, though it was only about 1-2%.
+Experimentation has shown that powering the system through wires and the connection of a USB-C for the graphs, did lead to some minor interference in the measurements, though it was only about 1-2%. After implementing a functioning FFT reporter, I turned towards the question of how fast the fourier transform was. The `micros()` function was clearly more suited to capture the resolution at this miniscule timescale instead of using ticks. Using the propper commands, the board's APB was found to be running at 80MHz. Inquiring about the timing ended up paying off, as the FFT was found to take approximately 25ms. This was brought down to 15 ms after switching the ArduinoFFT data type from `double` to `float`. If this project were built on hardware, the time could be reduced further.
 
 ### 100Hz Sampling
 Our initial sample will run at $100Hz$, which gives us a bin width of $0.781Hz$. Afterwards, every 5 seconds the sampled data is used to find a new sampling frequency. In our implementation we added a resting phase and a measuring phase, in order to distinguish between the actual FFT and the background processes.
 
 The code of our implementation is found in [MaxFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp).
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/max_freq.png)
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/measurements_100.png)
 
 As we see in our graph, there is not a lot of difference in terms of power consumption between the two phases. Nevertheless, there is a slight increase when measuring which is to be expected.
 
@@ -62,30 +62,24 @@ Also this signal is no problem for our FFT, since it identifies the lowest frequ
 
 In all three cases the adaptive sampling method lead to near-perfect results, which would scarcely be improved upon if instead over-sampling were implemented. (The code for this section is also contained within the same AdaptFrequency.cpp but with commented out lines.)
 
-## Performance
-### Latency
-After implementing a functioning FFT reporter, I turned towards the question of how fast the fourier transform was. The `micros()` function was clearly more suited to capture the resolution at this miniscule timescale instead of using ticks. Using the propper commands, the board's APB was found to be running at 80MHz. Inquiring about the timing ended up paying off, as the FFT was found to take approximately 25ms. This was brought down to 15 ms after switching the ArduinoFFT data type from `double` to `float`. If this project were built on hardware, the time could be reduced further.
-
-### Power measurements
-I tried implementing an INA219 component in my Wokwi simulator but that would lead to redundant information. Instead, I opted to simulate the consumption of power for different tasks the board was performing.
-
-Implementation can be found here at [PowerConsumption.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/PowerConsumption.cpp), and provides the following output:
-
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_PowerConsumption.png)
-
-The code works by establishing a baseline consumption of 55mA, since the ESP32 board is estimated to draw that much power while the CPU is running ([according to Section 4.1](https://documentation.espressif.com/esp32_datasheet_en.pdf)). Subsequently, a variable load proportional to the sampling frequency (currentFs) is added, representing the energy required to toggle the ADC and move data through memory. To simulate the FFT a conditional increase (adding 35–40mA) is triggered only when the FFT buffer is full. This is illustrated in the last entry for >Power in the output image.
-
-## Internet connection
-After struggling to setup MQTT, a functioning version could finally be implemented without crashing. In tandem with the 5 second reports, the system attempts to publish its aggregated findings (specifically the average signal value, the dominant frequency, the current sampling rate and the average execution time). For the implementation, we opted to wrap the findings in a JSON string and to utilize asynchronous communication.
+## WiFi and MQTT
+After struggling to setup MQTT, we settled on having 
 
 Running [RunMQTT.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/RunMQTT.cpp), yields:
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_internet.png)
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/measurements_wifi.png)
 
-The code is able to establish a connection and receive an IP but publishing the findings results in an error.
-That is because the Wokwi simulator requires a subscription that costs funds for WiFi functionality. Physical parts equally so.
+We see that approximately every 15 seconds a spike occurs in which the data is transfered to the server. 
 
-## Bonus and Project setup
+## Cloud connection
+For this section, I opted to use The Things Network. Also this was hard to setup, though I eventually managed to communicate data with the cloud as seen here:
+
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/cloud_computing.png)
+
+In order to avoid getting kicked of the server, I added a timer of 30000 miliseconds before sending each packet, as can be seen in the implemnation here [LoRa.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/LoRa.cpp). The readings of the board did not show measurements that deviated much from what has been seen before. 
+
+
+## Project setup
 We did not have time to implement to work on the bonus till the end. The code supplied in [Bonus.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/Bonus.cpp) only includes the signal generation, but not the fitlers. The output of this code looks like this:
 
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/Iot_Bonus.png)
