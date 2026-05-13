@@ -12,10 +12,15 @@ Individual Assignment for IoT course 2026, by Oliver van Douveren
 While the ESP32 hardware supports sampling rates [up to 2 MHz](https://docs.espressif.com/projects/esp-faq/en/latest/software-framework/peripherals/adc.html), we need to run experiments before we can come up with an actual answer. Luckily, a benchmark exists for this exact purpose: by running two seperate CPU cores in parallel to push and pull data through a queue as fast as possible for 1000 ticks, we can calculate the maximum frequency. 
 
 Running the code supplied in [MaxFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp), yields the following result:
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/max_freq.jpg)
 
+Our result of 32832.00 Hz falls short of the theoretical limit. For our use-case, however, it is more than enough for our present purposes.
+
+### Simulated Maximum Sampling
+Running the same code on a Wokwi gives us higher number than the real implementation, though nowhere near the theoretical limit:
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFrequency.png)
 
-Note that these specific results are unrealistic, however, since it runs in Wokwi. In any case, we have opted to cap the frequency rate at $100Hz$ which is also feasible for physical hardware and avoids oversampling.
+
 
 ## Adaptive Sampling
 Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $128$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. Our initial sample will run at $100Hz$, which gives us a bin width of $0.781Hz$. Afterwards, every 5 seconds the sampled data is used to find a new sampling frequency.
