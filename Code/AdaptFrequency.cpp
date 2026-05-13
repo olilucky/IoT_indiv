@@ -1,172 +1,96 @@
 #include <Arduino.h>
+#include <heltec_unofficial.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
-#include <arduinoFFT.h>
+#include <Adafruit_INA219.h>
+#include "arduinoFFT.h"
 
-// --- Global Objects ---
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+// --- Configuration ---
+#define SAMPLES 128           
+#define AGGREGATION_WINDOW_MS 5000 
 
-// --- FFT & Sampling Variables ---
-#define SAMPLES 128  // Increased from 64 for better frequency resolution
-float vReal[SAMPLES];
-float vImag[SAMPLES];
+double vReal[SAMPLES], vImag[SAMPLES];
+float currentMa = 0, busVoltage = 0, powerMw = 0;
+float samplingFreq = 100.0; 
+float detectedPeak = 0;
 
-// Instantiate FFT object with float type
-ArduinoFFT<float> FFT = ArduinoFFT<float>(vReal, vImag, SAMPLES, 100.0);
+uint32_t lastProcessingTimeUs = 0;
+uint32_t totalFFTsInWindow = 0;
 
-volatile float currentFs = 100.0;
-volatile float lastPeakFreq = 0.0;
-QueueHandle_t dataQueue;
-
-// --- Function Prototypes ---
-void SamplerTask(void *pvParameters);
-void ProcessingTask(void *pvParameters);
+Adafruit_INA219 ina219;
+ArduinoFFT<double> FFT;
 
 void setup() {
+    heltec_setup();
     Serial.begin(115200);
-
-    // Hardware Clock Info
-    uint32_t cpuFreq = getCpuFrequencyMhz();
-    uint32_t apbFreq = getApbFrequency();
-    Serial.println("\n--- Hardware Clock Info ---");
-    Serial.printf("CPU Frequency: %u MHz\n", cpuFreq);
-    Serial.printf("APB Frequency: %u Hz\n", apbFreq);
-    Serial.println("---------------------------");
     
-    // 1. I2C & LCD Initialization
-    Wire.begin(21, 22);
-    lcd.init();
-    lcd.backlight();
-    lcd.print("System Ready");
-
-    // 2. FreeRTOS Tasks
-    dataQueue = xQueueCreate(128, sizeof(float));  // Increased queue size
-    if (dataQueue != NULL) {
-        xTaskCreatePinnedToCore(SamplerTask, "Sampler", 4096, NULL, 2, NULL, 1);
-        xTaskCreatePinnedToCore(ProcessingTask, "Processor", 8192, NULL, 1, NULL, 0);
-        Serial.println("System Tasks Started");
+    Wire1.begin(19, 20);
+    if (!ina219.begin(&Wire1)) {
+        Serial.println("[ERROR] INA219 not found");
     }
+    
+    display.setContrast(255);
 }
 
 void loop() {
-    // Main loop stays empty in FreeRTOS
-}
+    uint32_t windowStart = millis();
+    totalFFTsInWindow = 0;
 
-// --- Sampler Task (Core 1) ---
-void SamplerTask(void *pvParameters) {
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    float t = 0;
-    while (1) {
-        // Simulated Signal - 3Hz + 5Hz components
-        float val = 2.0 * sin(2.0 * PI * 3.0 * t) + 4.0 * sin(2.0 * PI * 5.0 * t);
-        //float val = 6.0 * sin(2.0 * PI * 9.0 * t) + 6.0 * sin(2.0 * PI * 7.0 * t);
-        //float val = 8.0 * sin(2.0 * PI * 6.0 * t) + 3.0 * sin(2.0 * PI * 10.0 * t) + 5.0 * sin(2.0 * PI * 25.0 * t);
+    // --- 5 SECOND AGGREGATION WINDOW ---
+    while (millis() - windowStart < AGGREGATION_WINDOW_MS) {
         
-        xQueueSend(dataQueue, &val, 0);
-        
-        t += (1.0 / currentFs);
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000.0 / currentFs));
-    }
-}
-
-// --- Processing Task (Core 0) ---
-void ProcessingTask(void *pvParameters) {
-    float sample;
-    int fftCount = 0;
-    float runningSum = 0;
-    int samplesProcessed = 0;
-    unsigned long windowStartTime = millis();
-    unsigned long queueFullTime = 0;
-
-    // Metrics Tracking
-    uint32_t lastExecutionTime = 0;
-    uint32_t totalExecTime = 0; 
-    int fftCalculationsInWindow = 0;
-
-    while (1) {
-        if (xQueueReceive(dataQueue, &sample, portMAX_DELAY)) {
+        // --- 1. SENSING PHASE ---
+        float sampling_period_us = 1000000.0 / samplingFreq;
+        for (int i = 0; i < SAMPLES; i++) {
+            uint32_t startSample = micros();
             
-            // 1. Accumulate statistics
-            runningSum += sample;
-            samplesProcessed++;
+            // Input Signal Simulation
+            float t = startSample / 1000000.0f;
+            vReal[i] = 2.0 * sin(2.0 * PI * 3.0 * t) + 4.0 * sin(2.0 * PI * 5.0 * t);
+            vImag[i] = 0;
+
+            // Continuous Power Metrics for Teleplot
+            currentMa = ina219.getCurrent_mA();
+            busVoltage = ina219.getBusVoltage_V();
+            powerMw = busVoltage * currentMa;
             
-            // 2. Fill FFT Buffer
-            vReal[fftCount] = sample;
-            vImag[fftCount] = 0.0f;
-            fftCount++;
+            // Teleplot Stream: V-mA-W-Hz
+            Serial.printf(">Voltage_V:%.2f\n", busVoltage);
+            Serial.printf(">Current_mA:%.2f\n", currentMa);
+            Serial.printf(">Power_mW:%.2f\n", powerMw);
+            Serial.printf(">Sampling_Hz:%.2f\n", samplingFreq);
 
-            // 3. Perform FFT when buffer is full
-            if (fftCount == SAMPLES) {
-                uint32_t startU = micros(); 
-
-                // Apply windowing
-                FFT.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-                FFT.compute(FFT_FORWARD);
-                FFT.complexToMagnitude();
-                
-                // Find actual peak between 4-7 Hz (where your 5Hz signal lives)
-                float peakMagnitude = 0;
-                float peakFrequency = 5.0;  // Default to 5Hz if nothing found
-                float freqResolution = currentFs / SAMPLES;
-                
-                // Only search in the 4-7 Hz range
-                int startBin = max(1, (int)(4.0 / freqResolution));
-                int endBin = min(SAMPLES/2 - 1, (int)(7.0 / freqResolution));
-                
-                for (int i = startBin; i <= endBin; i++) {
-                    if (vReal[i] > peakMagnitude) {
-                        peakMagnitude = vReal[i];
-                        peakFrequency = i * freqResolution;
-                    }
-                }
-                
-                // Use the manually detected peak
-                lastPeakFreq = peakFrequency;
-                
-                // Adaptive sampling logic (maintain Nyquist: Fs >= 2.5 * highest frequency)
-                // Since we have 3Hz and 5Hz, need Fs >= 12.5Hz minimum
-                float newFs = max(lastPeakFreq * 3.0, 20.0);
-                currentFs = constrain(newFs, 20.0, 200.0);
-
-                uint32_t endU = micros(); 
-                
-                lastExecutionTime = endU - startU;
-                totalExecTime += lastExecutionTime;
-                fftCalculationsInWindow++;
-                queueFullTime = millis();
-
-                fftCount = 0;
-            }
-
-            // 4. 5-Second Aggregation Report
-            if (millis() - windowStartTime >= 5000) {
-                unsigned long reportLatency = millis() - queueFullTime;
-                float avg = (samplesProcessed > 0) ? (runningSum / samplesProcessed) : 0;
-                uint32_t avgExec = (fftCalculationsInWindow > 0) ? (totalExecTime / fftCalculationsInWindow) : 0;
-
-                // Serial Output
-                Serial.printf("\n--- 5s Aggregate Report ---\n");
-                Serial.printf("Execution: %u us (Avg: %u us)\n", lastExecutionTime, avgExec);
-                Serial.printf("Latency:   %lu ms\n", reportLatency);
-                Serial.printf("Signal:    Avg %.3f V | Peak %.1f Hz\n", avg, lastPeakFreq);
-                Serial.printf("Sampling:  Fs %.1f Hz\n", currentFs);
-                Serial.printf("Resolution: %.2f Hz/bin\n", currentFs / SAMPLES);
-                Serial.println("---------------------------");
-
-                // LCD Update
-                lcd.clear();
-                lcd.setCursor(0, 0);
-                lcd.printf("Avg:%.2f Pk:%.1f", avg, lastPeakFreq);
-                lcd.setCursor(0, 1);
-                lcd.printf("Fs:%.0f Lat:%ums", currentFs, (uint32_t)reportLatency);
-
-                // Reset Window
-                runningSum = 0;
-                samplesProcessed = 0;
-                totalExecTime = 0;
-                fftCalculationsInWindow = 0;
-                windowStartTime = millis();
-            }
+            // Maintain Sampling Rate
+            while (micros() - startSample < sampling_period_us) { yield(); }
         }
+
+        // --- 2. ANALYSIS PHASE (Processing Latency) ---
+        uint32_t anaStart = micros();
+        
+        FFT = ArduinoFFT<double>(vReal, vImag, SAMPLES, samplingFreq);
+        FFT.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+        FFT.compute(FFT_FORWARD);
+        FFT.complexToMagnitude();
+        detectedPeak = (float)FFT.majorPeak();
+
+        // Adaptive Frequency Adjustment
+        if (detectedPeak > 0) {
+            samplingFreq = constrain(detectedPeak * 4.0, 20.0, 200.0);
+        }
+        
+        lastProcessingTimeUs = micros() - anaStart; // Actual calculation time
+        totalFFTsInWindow++;
     }
+
+    // --- REPORTING PHASE (OLED) ---
+    display.clear();
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(0, 0, "Freq: " + String(samplingFreq, 1) + " Hz");
+    display.drawString(0, 15, "Latency: " + String(lastProcessingTimeUs / 1000.0, 2) + " ms");
+    display.drawString(0, 30, "Current: " + String(currentMa, 1) + " mA");
+    display.drawString(0, 45, "FFT Cycles: " + String(totalFFTsInWindow));
+    display.display();
+
+    // Serial Summary
+    Serial.printf("\n[WINDOW CLOSED] Latency: %.2f ms | Avg Freq: %.2f Hz\n\n", 
+                  lastProcessingTimeUs / 1000.0, samplingFreq);
 }
