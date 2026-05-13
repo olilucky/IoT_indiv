@@ -1,75 +1,110 @@
 #include <Arduino.h>
+#include <heltec_unofficial.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
-#include <arduinoFFT.h>
+#include <Adafruit_INA219.h>
+#include "arduinoFFT.h"
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+// --- Configuration ---
+#define SAMPLING_FREQ 100.0   
+#define SAMPLES 128           
+#define WINDOW_MS 5000        
+#define REST_MS 5000          
 
-#define SAMPLES 64
-float vReal[SAMPLES];
-float vImag[SAMPLES];
-ArduinoFFT<float> FFT = ArduinoFFT<float>(vReal, vImag, SAMPLES, 100.0);
+// Global Variables
+double vReal[SAMPLES], vImag[SAMPLES];
+float currentMa = 0, busVoltage = 0, powerMw = 0;
+float detectedPeak = 0;
+bool isResting = false;
 
-volatile float currentFs = 100.0;
-volatile float lastPeakFreq = 0.0;
-QueueHandle_t dataQueue;
-float currentPower_mA = 50.0; 
+Adafruit_INA219 ina219;
+ArduinoFFT<double> FFT;
 
-void SamplerTask(void *pvParameters);
-void ProcessingTask(void *pvParameters);
-
-void setup() {
-    Serial.begin(115200);
-    Wire.begin(21, 22);
-    lcd.init();
-    lcd.backlight();
-    lcd.print("Graphing Mode");
-
-    dataQueue = xQueueCreate(SAMPLES, sizeof(float)); 
-    if (dataQueue != NULL) {
-        xTaskCreatePinnedToCore(SamplerTask, "Sampler", 4096, NULL, 2, NULL, 1);
-        xTaskCreatePinnedToCore(ProcessingTask, "Processor", 8192, NULL, 1, NULL, 0);
-    }
-}
-
-void loop() { vTaskDelete(NULL); }
-
-void SamplerTask(void *pvParameters) {
+// --- SAMPLER (CORE 0) ---
+void samplerTask(void *pv) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    float t = 0;
-    while (1) {
-        float val = 2.0 * sin(2.0 * PI * 3.0 * t) + 4.0 * sin(2.0 * PI * 5.0 * t);
-        xQueueSend(dataQueue, &val, 0);
-        t += (1.0 / currentFs);
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000.0 / currentFs));
-    }
-}
+    const TickType_t xFrequency = pdMS_TO_TICKS(1000 / SAMPLING_FREQ); 
 
-void ProcessingTask(void *pvParameters) {
-    float sample;
-    int fftCount = 0;
-    while (1) {
-        if (xQueueReceive(dataQueue, &sample, portMAX_DELAY)) {
-            currentPower_mA = 55.0 + (currentFs / 15.0);
-            vReal[fftCount] = sample;
-            vImag[fftCount] = 0.0f;
-            fftCount++;
+    while (true) {
+        if (!isResting) {
+            for (int i = 0; i < SAMPLES; i++) {
+                float t = micros() / 1000000.0f;
+                vReal[i] = 2.0 * sin(2.0 * PI * 3.0 * t) + 4.0 * sin(2.0 * PI * 5.0 * t);
+                vImag[i] = 0;
 
-            if (fftCount == SAMPLES) {
-                currentPower_mA += 35.0; // CPU spike
-                FFT.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-                FFT.compute(FFT_FORWARD);
-                FFT.complexToMagnitude();
-                lastPeakFreq = (float)FFT.majorPeak();
-                currentFs = constrain(lastPeakFreq * 2.5, 20.0, 150.0);
-                fftCount = 0;
+                currentMa = ina219.getCurrent_mA();
+                busVoltage = ina219.getBusVoltage_V();
+                powerMw = busVoltage * currentMa;
+
+                vTaskDelayUntil(&xLastWakeTime, xFrequency);
             }
 
-            // --- THE BETTER WAY: SERIAL TELEMETRY ---
-            // No libraries, no WiFi. Just print the Teleplot "Magic Prefix"
-            Serial.print(">Power:");   Serial.println(currentPower_mA);
-            Serial.print(">Signal:");  Serial.println(sample);
-            Serial.print(">PeakFreq:"); Serial.println(lastPeakFreq);
+            FFT = ArduinoFFT<double>(vReal, vImag, SAMPLES, SAMPLING_FREQ);
+            FFT.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+            FFT.compute(FFT_FORWARD);
+            FFT.complexToMagnitude();
+            detectedPeak = (float)FFT.majorPeak();
+        } else {
+            detectedPeak = 0; // Reset peak while resting
+            currentMa = ina219.getCurrent_mA();
+            busVoltage = ina219.getBusVoltage_V();
+            powerMw = busVoltage * currentMa;
+            vTaskDelay(pdMS_TO_TICKS(100)); 
         }
+    }
+}
+
+// --- CONTROLLER (CORE 1) ---
+void controllerTask(void *pv) {
+    while (true) {
+        isResting = false;
+        display.setContrast(255); 
+        vTaskDelay(pdMS_TO_TICKS(WINDOW_MS));
+
+        isResting = true;
+        display.setContrast(0);   
+        vTaskDelay(pdMS_TO_TICKS(REST_MS));
+    }
+}
+
+void setup() {
+    heltec_setup();
+    Serial.begin(115200);
+
+    Wire1.begin(19, 20);
+    ina219.begin(&Wire1);
+
+    xTaskCreatePinnedToCore(samplerTask, "Sampler", 8192, NULL, 5, NULL, 0);
+    xTaskCreatePinnedToCore(controllerTask, "Controller", 4096, NULL, 5, NULL, 1);
+}
+
+void loop() {
+    // --- TELEPLOT OUTPUT ---
+    static uint32_t lastTele = 0;
+    if (millis() - lastTele > 50) { 
+        Serial.printf(">Voltage_V:%.2f\n", busVoltage);
+        Serial.printf(">Current_mA:%.2f\n", currentMa);
+        Serial.printf(">Power_mW:%.2f\n", powerMw);
+        // Force peak to 0 in teleplot if resting
+        Serial.printf(">Detected_Peak_Hz:%.2f\n", isResting ? 0.0f : detectedPeak);
+        lastTele = millis();
+    }
+
+    // --- OLED DISPLAY ---
+    static uint32_t lastDisp = 0;
+    if (millis() - lastDisp > 200) {
+        display.clear();
+        if (!isResting) {
+            display.drawString(0, 0, "MODE: ACTIVE (100Hz)");
+            display.drawString(0, 12, "Peak: " + String(detectedPeak, 1) + " Hz");
+        } else {
+            display.drawString(0, 0, "MODE: RESTING");
+            display.drawString(0, 12, "(Screen Dimmed)");
+        }
+        
+        display.drawString(0, 28, "V: " + String(busVoltage, 2) + " V");
+        display.drawString(0, 40, "P: " + String(powerMw, 1) + " mW");
+        
+        display.display();
+        lastDisp = millis();
     }
 }
