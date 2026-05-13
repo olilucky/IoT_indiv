@@ -7,8 +7,8 @@
 #include "arduinoFFT.h"
 
 // --- Settings ---
-const char* ssid     = "boat";
-const char* password = "mymilkshake";
+const char* ssid     = "__";
+const char* password = "__";
 const char* mqtt_server = "broker.hivemq.com"; // Public Broker
 
 // --- Global Data ---
