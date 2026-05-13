@@ -21,27 +21,32 @@ Running the same code on a Wokwi gives us higher number than the real implementa
 
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFrequency.png)
 
-
-
 ## Adaptive Sampling
 Now we will focus on applying the FFT to the example signal specified in the assignment: $2\sin(2\pi * 3 * t) + 4 \sin(2 \pi * 5 * t)$. Using the dual-core architecture of our board, we dedicate one core to generating signal samples and the other to processing said samples. The Sampler collects samples using a `dataQueue` which was given a length of $128$ in this implemntation, since it dictates the accuracy of the FFT. The resolution of our FFT can be calculated with the formula $\Delta f = f_{sampling} / N_{Queue}$. For the performance, we chose to pay attention to the mA, current and energy consumption.
+
+Experimentation has shown that powering the system through wires and the connection of a USB-C for the graphs, did lead to some minor interference in the measurements, though it was only about 1-2%.
 
 ### 100Hz Sampling
 Our initial sample will run at $100Hz$, which gives us a bin width of $0.781Hz$. Afterwards, every 5 seconds the sampled data is used to find a new sampling frequency. In our implementation we added a resting phase and a measuring phase, in order to distinguish between the actual FFT and the background processes.
 
 The code of our implementation is found in [MaxFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/MaxFrequency.cpp).
 
-![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/MaxFreq.png)
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/max_freq.png)
 
 As we see in our graph, there is not a lot of difference in terms of power consumption between the two phases. Nevertheless, there is a slight increase when measuring which is to be expected.
 
+### Adaptive
 
-Our implementation is found in [AdaptFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/AdaptFrequency.cpp).
+Next, for the adaptive sampling we collect data for 5 seconds, then perform the FFT and then adjust the sampling frequency accordingly. 
 
-All in all, thanks to our adapative sampling we are able to greatly decrease the CPU load from $100Hz$ to only $20Hz$.
+Our implementation is found in [AdaptFrequency.cpp](https://github.com/olilucky/IoT_indiv/blob/main/Code/AdaptFrequency.cpp). The yields the following readings:
 
-### Bonus signals
-Next, I wanted to see what happens when the signal consists of two waves with the same amplitude but different frequencies :
+![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/measurements_adaptive.png)
+
+Although the peak frequency is only 5Hz, we set the minimum sampling rate to 20Hz such that this is attained throughout the entire experiment. All in all, thanks to our adapative sampling we are able to greatly decrease the CPU load from $100Hz$ to only $20Hz$. Nonetheless, the energy efficiency gained is smaller than I had expected, though there is some improvement. This may be due to the prevalence of background processes.
+
+### Bonus signals (Simulated)
+For the bonus, I was curious to see what happens when the signal consists of two waves with the same amplitude but different frequencies :
 $6\sin(2 \pi * 9 * t) + 6\sin(2 \pi * 7 * t)$. A hypothesis could state that adaptive sampling would overestimate the peak frequency.
 
 ![output](https://github.com/olilucky/IoT_indiv/blob/main/Images/IoT_bonus1.png)
